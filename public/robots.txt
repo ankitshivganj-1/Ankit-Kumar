@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap for Shivganj Village Official Information Portal
+Sitemap: https://ais-pre-eg3z6htmgj4l5tvwguvk2w-743910504193.asia-northeast1.run.app/sitemap.xml

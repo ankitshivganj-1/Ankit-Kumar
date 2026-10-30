@@ -1,0 +1,6 @@
+{
+  "name": "Shivganj – हमारा गाँव, हमारी पहचान | Official Village Portal",
+  "description": "शिवगंज (भेतुआ ब्लॉक, सुल्तानपुर, उत्तर प्रदेश) की आधिकारिक ग्राम जानकारी, इतिहास, भूगोल, शिक्षा, स्वास्थ्य, मंदिर, मानचित्र और ग्राम गैलरी पोर्टल।",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
