@@ -5,7 +5,9 @@ import {
   filterGalleryItems,
   getNextCarouselIndex,
   HERO_AUTOPLAY_INTERVAL_MS,
+  HERO_CINEMATIC_SLIDES,
   searchVillageContent,
+  shouldShowWelcomePopup,
   validateContactForm,
 } from './villageLogic';
 import { DIRECTORY_ITEMS, INITIAL_GALLERY_ITEMS, VILLAGE_CONFIG } from '../data/villageConfig';
@@ -164,3 +166,14 @@ test('VILLAGE_CONFIG.contact.socialLinks and identity administrative details are
   assert.equal(VILLAGE_CONFIG.identity.divisionHi, 'अयोध्या मंडल (Ayodhya Division)');
   assert.equal(VILLAGE_CONFIG.identity.divisionEn, 'Ayodhya Division');
 });
+
+test('shouldShowWelcomePopup respects autostart=1, skipWelcome=1, and session dismissal while defaulting to true', () => {
+  assert.equal(shouldShowWelcomePopup('', null), true);
+  assert.equal(shouldShowWelcomePopup('?lang=hi', 'false'), true);
+  assert.equal(shouldShowWelcomePopup('?autostart=1', null), false);
+  assert.equal(shouldShowWelcomePopup('?skipWelcome=1', null), false);
+  assert.equal(shouldShowWelcomePopup('', 'true'), false);
+  assert.equal(HERO_CINEMATIC_SLIDES.length, 4);
+  assert.equal(HERO_CINEMATIC_SLIDES[1].titleHi, 'भेटुआ (3 KM) · घाटमपुर');
+});
+

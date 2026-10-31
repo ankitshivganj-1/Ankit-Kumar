@@ -202,3 +202,113 @@ export function getNextCarouselIndex(
   }
   return (currentIndex + 1) % totalSlides;
 }
+
+/**
+ * Determines whether the Welcome Popup should appear on initial load.
+ * Skips automatically if `?autostart=1` or `?skipWelcome=1` is present in the URL,
+ * or if the user has already dismissed the popup in the current session.
+ */
+export function shouldShowWelcomePopup(
+  searchParamsString: string,
+  dismissedSessionValue: string | null
+): boolean {
+  if (dismissedSessionValue === 'true') {
+    return false;
+  }
+  const normalized = searchParamsString.startsWith('?')
+    ? searchParamsString.slice(1)
+    : searchParamsString;
+  const params = new URLSearchParams(normalized);
+  if (params.get('autostart') === '1' || params.get('skipWelcome') === '1') {
+    return false;
+  }
+  return true;
+}
+
+export interface HeroCinematicSlide {
+  id: string;
+  slideNumber: string;
+  titleHi: string;
+  titleEn: string;
+  badgeHi: string;
+  badgeEn: string;
+  descriptionHi: string;
+  descriptionEn: string;
+  href: string;
+  gradient: string;
+  accentColor: string;
+  auraGlow: string;
+  svgType: 'waterfall' | 'valley' | 'meadow' | 'canyon';
+}
+
+export const HERO_CINEMATIC_SLIDES: HeroCinematicSlide[] = [
+  {
+    id: 'rivers',
+    slideNumber: '01',
+    titleHi: 'गोमती और सई नदी क्षेत्र',
+    titleEn: 'Gomti & Sai River Belt',
+    badgeHi: 'नदियाँ व प्रकृति',
+    badgeEn: 'Rivers & Nature',
+    descriptionHi:
+      'गोमती और सई नदियों की उपजाऊ दोआब भूमि, हरियाली और शांत ग्रामीण वातावरण शिवगंज की कृषि समृद्धि का आधार है।',
+    descriptionEn:
+      'Fertile plains nourished by the Gomti and Sai river belt, lush green pastures, and tranquil rural ecology.',
+    href: '#rivers',
+    gradient: 'linear-gradient(180deg, #9DB3C1 0%, #3E5868 55%, #1D2D36 100%)',
+    accentColor: '#CFE4F2',
+    auraGlow: 'radial-gradient(circle at 75% 40%, rgba(125, 195, 232, 0.24) 0%, transparent 65%)',
+    svgType: 'waterfall',
+  },
+  {
+    id: 'geography',
+    slideNumber: '02',
+    titleHi: 'भेटुआ (3 KM) · घाटमपुर',
+    titleEn: 'Bhetua (3 KM) · Ghatampur',
+    badgeHi: '106m समुद्र तल ऊँचाई',
+    badgeEn: '106m Elevation',
+    descriptionHi:
+      'घाटमपुर ग्राम पंचायत एवं भेटुआ विकास खंड (ज़िला अमेठी, अयोध्या मंडल) के अंतर्गत समुद्र तल से 106 मीटर की ऊँचाई पर स्थित।',
+    descriptionEn:
+      'Part of Ghatampur Gram Panchayat and Bhetua Block in Amethi District (Ayodhya Division) at 106m ASL.',
+    href: '#geography',
+    gradient: 'linear-gradient(180deg, #B9C8D2 0%, #3F6A34 50%, #1C3518 100%)',
+    accentColor: '#98B822',
+    auraGlow: 'radial-gradient(circle at 75% 40%, rgba(154, 181, 26, 0.26) 0%, transparent 65%)',
+    svgType: 'valley',
+  },
+  {
+    id: 'facilities',
+    slideNumber: '03',
+    titleHi: 'प्राचीन मंदिर एवं विद्यालय',
+    titleEn: 'Temples & Schools',
+    badgeHi: 'संस्कृति व शिक्षा',
+    badgeEn: 'Culture & Education',
+    descriptionHi:
+      'हनुमान जी मंदिर, काली मंदिर, डॉ. पुष्पेंद्र सिंह स्मारक महाविद्यालय और PHC शिवगंज जैसी प्रमुख संस्थाएँ।',
+    descriptionEn:
+      'Home to Hanuman Ji Mandir, Kali Mandir, Dr. Pushpendra Singh Smarak Mahavidyalaya, and PHC Shivganj.',
+    href: '#facilities',
+    gradient: 'linear-gradient(180deg, #5A8AD2 0%, #5F7630 55%, #6B8E23 100%)',
+    accentColor: '#A8C82A',
+    auraGlow: 'radial-gradient(circle at 75% 40%, rgba(184, 216, 46, 0.25) 0%, transparent 65%)',
+    svgType: 'meadow',
+  },
+  {
+    id: 'map-section',
+    slideNumber: '04',
+    titleHi: '6VF2+VH पूरब द्वारा मैप',
+    titleEn: '6VF2+VH Purab Dwara Map',
+    badgeHi: 'अमेठी · 227412',
+    badgeEn: 'Amethi · 227412',
+    descriptionHi:
+      'सत्यापित Google Map Plus Code (6VF2+VH Ankit, Purab Dwara, UP 227412) और लाइव मौसम डैशबोर्ड।',
+    descriptionEn:
+      'Verified Google Map Plus Code (6VF2+VH Ankit, Purab Dwara, UP 227412) and live weather telemetry.',
+    href: '#map-section',
+    gradient: 'linear-gradient(180deg, #C6B299 0%, #2C5342 52%, #14334A 100%)',
+    accentColor: '#7DC3E8',
+    auraGlow: 'radial-gradient(circle at 75% 40%, rgba(96, 185, 154, 0.25) 0%, transparent 65%)',
+    svgType: 'canyon',
+  },
+];
+

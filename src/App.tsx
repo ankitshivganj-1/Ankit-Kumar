@@ -4,7 +4,9 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
+  ArrowRight,
   ArrowUp,
   Bell,
   BookOpen,
@@ -30,72 +32,16 @@ import {
 import {
   getNextCarouselIndex,
   HERO_AUTOPLAY_INTERVAL_MS,
+  HERO_CINEMATIC_SLIDES,
   searchVillageContent,
+  shouldShowWelcomePopup,
 } from './utils/villageLogic';
 import { HistorySection } from './components/HistorySection';
 import { VillageDirectorySections } from './components/VillageDirectorySections';
 import { MapAndWeatherSection } from './components/MapAndWeatherSection';
 import { VillageGallerySection } from './components/VillageGallerySection';
 import { ContactAndGuideSection } from './components/ContactAndGuideSection';
-
-interface HeroSliceItem {
-  id: string;
-  titleHi: string;
-  titleEn: string;
-  badgeHi: string;
-  badgeEn: string;
-  href: string;
-  gradient: string;
-  accentColor: string;
-  svgType: 'waterfall' | 'valley' | 'meadow' | 'canyon';
-}
-
-const HERO_SLICE_ITEMS: HeroSliceItem[] = [
-  {
-    id: 'rivers',
-    titleHi: 'गोमती और सई नदी क्षेत्र',
-    titleEn: 'Gomti & Sai River Belt',
-    badgeHi: 'नदियाँ व प्रकृति',
-    badgeEn: 'Rivers & Nature',
-    href: '#rivers',
-    gradient: 'linear-gradient(180deg, #9DB3C1 0%, #3E5868 55%, #1D2D36 100%)',
-    accentColor: '#CFE4F2',
-    svgType: 'waterfall',
-  },
-  {
-    id: 'geography',
-    titleHi: 'भेतुआ (3 KM) · घाटमपुर',
-    titleEn: 'Bhetua (3 KM) · Ghatampur',
-    badgeHi: '106m समुद्र तल ऊँचाई',
-    badgeEn: '106m Elevation',
-    href: '#geography',
-    gradient: 'linear-gradient(180deg, #B9C8D2 0%, #3F6A34 50%, #1C3518 100%)',
-    accentColor: '#98B822',
-    svgType: 'valley',
-  },
-  {
-    id: 'facilities',
-    titleHi: 'प्राचीन मंदिर एवं विद्यालय',
-    titleEn: 'Temples & Schools',
-    badgeHi: 'संस्कृति व शिक्षा',
-    badgeEn: 'Culture & Education',
-    href: '#facilities',
-    gradient: 'linear-gradient(180deg, #5A8AD2 0%, #5F7630 55%, #6B8E23 100%)',
-    accentColor: '#A8C82A',
-    svgType: 'meadow',
-  },
-  {
-    id: 'map-section',
-    titleHi: '6VF2+VH पूरब द्वारा मैप',
-    titleEn: '6VF2+VH Purab Dwara Map',
-    badgeHi: 'अमेठी · 227412',
-    badgeEn: 'Amethi · 227412',
-    href: '#map-section',
-    gradient: 'linear-gradient(180deg, #C6B299 0%, #2C5342 52%, #14334A 100%)',
-    accentColor: '#7DC3E8',
-    svgType: 'canyon',
-  },
-];
+import { WelcomePopupModal } from './components/WelcomePopupModal';
 
 export default function App() {
   const [lang, setLang] = useState<Language>('hi');
@@ -104,10 +50,23 @@ export default function App() {
   const [activeSectionFilter, setActiveSectionFilter] = useState<string>('all');
   const [shareCopied, setShareCopied] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState<number>(0);
   const [activeHeroSlice, setActiveHeroSlice] = useState<number>(0);
+  const [slideDirection, setSlideDirection] = useState<'next' | 'prev'>('next');
   const [isHeroCarouselPaused, setIsHeroCarouselPaused] = useState<boolean>(false);
+  const [welcomePopupOpen, setWelcomePopupOpen] = useState<boolean>(() => {
+    try {
+      return shouldShowWelcomePopup(
+        window.location.search,
+        sessionStorage.getItem('shivganj_welcome_dismissed')
+      );
+    } catch {
+      return true;
+    }
+  });
 
   const searchResults = searchVillageContent(searchQuery);
+  const currentSlide = HERO_CINEMATIC_SLIDES[activeHeroSlice] || HERO_CINEMATIC_SLIDES[0];
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -115,25 +74,54 @@ export default function App() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setShowBackToTop(window.scrollY > 480);
+      const currentY = window.scrollY;
+      setShowBackToTop(currentY > 480);
+      const maxScroll =
+        document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      if (maxScroll > 0) {
+        setScrollProgress(Math.min(1, Math.max(0, currentY / maxScroll)));
+      }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Auto-playing Hero Highlight Carousel: cycles every 5 seconds, pauses on hover
+  // Auto-playing Hero Highlight Carousel: cycles every 5 seconds, pauses on hover or when welcome modal is open
   useEffect(() => {
-    if (isHeroCarouselPaused) {
+    if (isHeroCarouselPaused || welcomePopupOpen) {
       return;
     }
     const timerId = window.setInterval(() => {
+      setSlideDirection('next');
       setActiveHeroSlice((prev) =>
-        getNextCarouselIndex(prev, HERO_SLICE_ITEMS.length, 'next')
+        getNextCarouselIndex(prev, HERO_CINEMATIC_SLIDES.length, 'next')
       );
     }, HERO_AUTOPLAY_INTERVAL_MS);
 
     return () => window.clearInterval(timerId);
-  }, [isHeroCarouselPaused]);
+  }, [isHeroCarouselPaused, welcomePopupOpen]);
+
+  const handleCloseWelcomePopup = () => {
+    setWelcomePopupOpen(false);
+    try {
+      sessionStorage.setItem('shivganj_welcome_dismissed', 'true');
+    } catch {
+      // Ignore storage error
+    }
+  };
+
+  const handleNavigateFromWelcome = (sectionHash: string) => {
+    handleCloseWelcomePopup();
+    setTimeout(() => {
+      const id = sectionHash.replace('#', '');
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.location.hash = sectionHash;
+      }
+    }, 120);
+  };
 
   const handleSharePortal = async () => {
     const shareUrl = window.location.href;
@@ -142,7 +130,7 @@ export default function App() {
       try {
         await navigator.share({
           title: shareTitle,
-          text: 'उत्तर प्रदेश के अमेठी ज़िले के भेतुआ क्षेत्र में बसे हमारे गाँव शिवगंज का आधिकारिक पोर्टल देखें।',
+          text: 'उत्तर प्रदेश के अमेठी ज़िले के भेटुआ क्षेत्र में बसे हमारे गाँव शिवगंज का आधिकारिक पोर्टल देखें।',
           url: shareUrl,
         });
         return;
@@ -160,32 +148,51 @@ export default function App() {
   };
 
   const handlePrevSlice = () => {
+    setSlideDirection('prev');
     setActiveHeroSlice((prev) =>
-      getNextCarouselIndex(prev, HERO_SLICE_ITEMS.length, 'prev')
+      getNextCarouselIndex(prev, HERO_CINEMATIC_SLIDES.length, 'prev')
     );
   };
 
   const handleNextSlice = () => {
+    setSlideDirection('next');
     setActiveHeroSlice((prev) =>
-      getNextCarouselIndex(prev, HERO_SLICE_ITEMS.length, 'next')
+      getNextCarouselIndex(prev, HERO_CINEMATIC_SLIDES.length, 'next')
     );
   };
 
   return (
     <div id="top" className="min-h-screen flex flex-col bg-[#121D16] text-zinc-100">
+      {/* Premium Animated Glassmorphism Welcome Popup */}
+      <WelcomePopupModal
+        isOpen={welcomePopupOpen}
+        lang={lang}
+        onSelectLang={setLang}
+        onClose={handleCloseWelcomePopup}
+        onNavigateSection={handleNavigateFromWelcome}
+      />
+
       {/* Strict 3-Zone Top Navigation Bar Contract — Translucent Misty Forest Glass Header */}
-      <header className="sticky top-0 z-40 bg-[#121D16]/80 backdrop-blur-xl border-b border-white/15">
+      <header className="sticky top-0 z-40 bg-[#121D16]/82 backdrop-blur-2xl border-b border-white/15 relative">
+        {/* Top Cinematic Scroll Progress Bar */}
+        <div
+          aria-hidden="true"
+          className="absolute top-0 left-0 right-0 h-[2.5px] bg-white/5 overflow-hidden pointer-events-none"
+        >
+          <div
+            className="h-full bg-gradient-to-r from-[#8CA617] via-[#D5EC63] to-[#8CA617] origin-left transition-transform duration-150 ease-out"
+            style={{ transform: `scaleX(${scrollProgress})` }}
+          />
+        </div>
+
         <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
-          {/* Zone 1: Two-Tone Brand Wordmark matching "GreenHaven" in Reference */}
+          {/* Zone 1: Single Brand Wordmark */}
           <a
             href="#top"
             className="text-xl tracking-wider whitespace-nowrap shrink-0 flex items-center gap-1"
           >
             <span className="font-extrabold text-[#8CA617]">Shiv</span>
             <span className="font-bold text-white">ganj</span>
-            <span className="text-sm font-medium text-white/85 ml-1.5 tracking-normal">
-              · शिवगंज
-            </span>
           </a>
 
           {/* Zone 2: 5 Concise Single-Line Text Navigation Links */}
@@ -291,7 +298,7 @@ export default function App() {
       </header>
 
       <main className="flex-1">
-        {/* Operational Utility & Search Toolbar (Language Toggle, Content Search, Breadcrumb & Share) */}
+        {/* Operational Utility & Search Toolbar (Language Toggle, Content Search, Welcome Popup Trigger & Share) */}
         <div className="bg-[#15221A]/90 backdrop-blur-md border-b border-white/15">
           <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             {/* Semantic Breadcrumb Navigation */}
@@ -305,7 +312,7 @@ export default function App() {
               </a>
               <span aria-hidden="true">/</span>
               <a href="#geography" className="hover:underline text-white font-medium">
-                {lang === 'hi' ? 'भेतुआ ब्लॉक' : 'Bhetua Block'}
+                {lang === 'hi' ? 'भेटुआ ब्लॉक' : 'Bhetua Block'}
               </a>
               <span aria-hidden="true">/</span>
               <span className="font-semibold text-[#A8C628]">
@@ -313,10 +320,10 @@ export default function App() {
               </span>
             </nav>
 
-            {/* Right Controls: Search Bar + Bilingual Toggle + Social Share */}
+            {/* Right Controls: Search Bar + Bilingual Toggle + Welcome Tour Button + Social Share */}
             <div className="flex flex-wrap items-center gap-2.5">
               {/* Instant Website Content Search Bar */}
-              <div className="relative flex-1 sm:w-80">
+              <div className="relative flex-1 sm:w-72">
                 <Search
                   className="w-3.5 h-3.5 text-zinc-300 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
                   aria-hidden="true"
@@ -365,6 +372,17 @@ export default function App() {
                   English
                 </button>
               </div>
+
+              {/* Re-open Welcome Popup Button */}
+              <button
+                type="button"
+                data-testid="open-welcome-popup-btn"
+                onClick={() => setWelcomePopupOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium glass-pill-btn rounded-full text-white whitespace-nowrap shrink-0"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#A8C628]" aria-hidden="true" />
+                <span>{lang === 'hi' ? 'स्वागत परिचय' : 'Welcome'}</span>
+              </button>
 
               {/* Social Share Button */}
               <button
@@ -444,44 +462,56 @@ export default function App() {
 
         {/* =====================================================================
             HERO SECTION: FRAMED WHITE-BORDERED SPLIT-FROST GLASS WINDOW
-            (Exact Theme & Layout of Attached GreenHaven / Iceland Escape Image)
+            WITH CINEMATIC KEN BURNS, AURORA LIGHTING & SMOOTH SLIDE ANIMATIONS
            ===================================================================== */}
         <section
           id="home"
           className="relative py-8 sm:py-12 px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-white/15"
         >
-          {/* Full-Bleed Attached Shivganj Village Photograph Backdrop */}
-          <div className="absolute inset-0 z-0">
+          {/* Full-Bleed Attached Shivganj Village Photograph Backdrop with Cinematic Slow Zoom */}
+          <div className="absolute inset-0 z-0 overflow-hidden">
             <img
               src="/assets/aistudio/WhatsApp_Image_2026-10-31_at_12.48.14_AM_d6adbe71.jpeg"
-              alt="Shivganj Village pastoral landscape and cattle in Bhetua Block, Sultanpur"
+              alt="Shivganj Village pastoral landscape and cattle in Bhetua Block, Amethi"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-center"
+              className="w-full h-full object-cover object-center cinematic-ken-burns"
             />
             <div
               aria-hidden="true"
               className="absolute inset-0 bg-gradient-to-b from-[#121D16]/45 via-[#121D16]/25 to-[#121D16]/65"
             />
+            {/* Dynamic Slide-Synced Ambient Aurora Overlay */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 transition-opacity duration-500 pointer-events-none"
+              style={{ background: currentSlide.auraGlow }}
+            />
           </div>
 
-          {/* FLOATING WHITE-BORDERED GLASS WINDOW (Matching Reference Frame) */}
-          <div className="relative z-10 max-w-[1220px] mx-auto hero-glass-frame overflow-hidden min-h-[590px] flex flex-col justify-between">
-            {/* LEFT-HALF FROSTED GLASS BLUR LAYER (Covers left ~52% of the framed window) */}
+          {/* FLOATING WHITE-BORDERED GLASS WINDOW */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="relative z-10 max-w-[1220px] mx-auto hero-glass-frame overflow-hidden min-h-[600px] flex flex-col justify-between"
+          >
+            {/* LEFT-HALF FROSTED GLASS BLUR LAYER (Covers left ~53% of the framed window) */}
             <div
               aria-hidden="true"
               className="absolute inset-y-0 left-0 w-full lg:w-[53%] hero-left-frost z-0 border-r border-white/15"
             />
 
-            {/* Top Internal Glass Frame Bar (Brand + Quick Status Pill) */}
+            {/* Top Internal Glass Frame Bar (Brand + Regional Identity) */}
             <div className="relative z-10 px-6 sm:px-10 pt-7 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-lg sm:text-xl font-extrabold tracking-widest text-[#8CA617]">
                   Shiv
                 </span>
                 <span className="text-lg sm:text-xl font-bold tracking-widest text-white">
                   ganj
                 </span>
-                <span className="text-xs font-medium text-white/90 ml-2 px-2.5 py-0.5 rounded-full bg-black/25 border border-white/25">
+                <span className="text-xs font-medium text-white/95 ml-2">
+                  ·{' '}
                   {lang === 'hi'
                     ? 'हमारा गाँव, हमारी पहचान · अमेठी (UP)'
                     : 'Our Village, Our Identity · Amethi (UP)'}
@@ -494,27 +524,27 @@ export default function App() {
                 </span>
                 <a
                   href="#contact"
-                  className="olive-cta-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-white"
+                  className="olive-cta-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-white whitespace-nowrap shrink-0"
                 >
                   {lang === 'hi' ? 'संपर्क करें' : 'Contact Us'}
                 </a>
               </div>
             </div>
 
-            {/* Center Split Content: Monumental Typography on Left + 4 Slanted 3D Accordion Slice Cards on Right */}
-            <div className="relative z-10 px-6 sm:px-10 py-8 lg:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center flex-1">
-              {/* Left 6 Columns: Monumental Split-Contrast Display Title & Olive CTA */}
-              <div className="lg:col-span-6 space-y-5">
-                <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.22em] font-bold text-[#142619] bg-white/75 px-3 py-1 rounded-md shadow-sm">
+            {/* Center Split Content: Monumental Typography & Smooth Slide Spotlight on Left + 4 Slanted 3D Accordion Slice Cards on Right */}
+            <div className="relative z-10 px-6 sm:px-10 py-6 lg:py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center flex-1">
+              {/* Left 6 Columns: Monumental Split-Contrast Display Title, Animated Slide Spotlight & Olive CTA */}
+              <div className="lg:col-span-6 space-y-4">
+                <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] font-bold text-[#142619] bg-white/80 px-3 py-1 rounded-md shadow-sm">
                   <Sparkles className="w-3.5 h-3.5 text-[#6D830E]" aria-hidden="true" />
                   <span>
                     {lang === 'hi'
-                      ? 'घाटमपुर ग्राम पंचायत · भेतुआ ब्लॉक'
+                      ? 'घाटमपुर ग्राम पंचायत · भेटुआ ब्लॉक'
                       : 'GHATAMPUR PANCHAYAT · BHETUA BLOCK'}
                   </span>
                 </div>
 
-                {/* Monumental Split-Contrast Headline matching "ICELAND / ESCAPE" */}
+                {/* Monumental Split-Contrast Headline */}
                 <h1 className="font-extrabold uppercase leading-[0.95] select-none">
                   <span className="block text-5xl sm:text-6xl xl:text-7xl tracking-[0.2em]">
                     <span className="text-[#1A2E20] drop-shadow-[0_2px_10px_rgba(255,255,255,0.35)]">
@@ -535,8 +565,51 @@ export default function App() {
                     : 'Discover serene rural landscapes, Awadhi cultural heritage, and community life near the Gomti & Sai rivers in Bhetua Block, Amethi.'}
                 </p>
 
-                {/* Primary Solid Olive Button + Circular Play/Tour Button (Exact Reference Match) */}
-                <div className="pt-2 flex flex-wrap items-center gap-4">
+                {/* Smooth Animated Slide Spotlight Card (Syncs with Active Hero Slide) */}
+                <div className="max-w-md pt-1">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={currentSlide.id}
+                      data-testid="hero-active-slide-card"
+                      initial={{
+                        opacity: 0,
+                        x: slideDirection === 'next' ? 28 : -28,
+                      }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{
+                        opacity: 0,
+                        x: slideDirection === 'next' ? -28 : 28,
+                      }}
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                      className="glass-panel-strong glass-sheen-card rounded-2xl p-3.5 sm:p-4"
+                    >
+                      <div className="flex items-center justify-between gap-2 text-xs text-[#C6E23A] font-medium mb-1">
+                        <span>
+                          {currentSlide.slideNumber} / 04 ·{' '}
+                          {lang === 'hi' ? currentSlide.badgeHi : currentSlide.badgeEn}
+                        </span>
+                        <a
+                          href={currentSlide.href}
+                          className="inline-flex items-center gap-1 text-white hover:text-[#D5EC63] font-semibold transition-colors whitespace-nowrap shrink-0"
+                        >
+                          <span>{lang === 'hi' ? 'विवरण देखें' : 'Explore'}</span>
+                          <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                        </a>
+                      </div>
+                      <div className="text-sm sm:text-base font-bold text-white">
+                        {lang === 'hi' ? currentSlide.titleHi : currentSlide.titleEn}
+                      </div>
+                      <p className="mt-1 text-xs text-zinc-200 leading-relaxed line-clamp-2">
+                        {lang === 'hi'
+                          ? currentSlide.descriptionHi
+                          : currentSlide.descriptionEn}
+                      </p>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+                {/* Primary Solid Olive Button + Circular Play/Tour Button */}
+                <div className="pt-1 flex flex-wrap items-center gap-4">
                   <a
                     href="#directory"
                     className="olive-cta-btn px-7 py-3.5 rounded-xl text-sm font-semibold text-white whitespace-nowrap shrink-0"
@@ -546,9 +619,9 @@ export default function App() {
 
                   <a
                     href="#map-section"
-                    className="inline-flex items-center gap-3 group text-sm font-medium text-white hover:text-[#D5EC63] transition-colors"
+                    className="inline-flex items-center gap-3 group text-sm font-medium text-white hover:text-[#D5EC63] transition-colors whitespace-nowrap shrink-0"
                   >
-                    <span className="w-11 h-11 rounded-full border-2 border-white/85 bg-black/20 flex items-center justify-center group-hover:scale-105 group-hover:border-[#9AB51A] transition-transform">
+                    <span className="w-11 h-11 rounded-full border-2 border-white/85 bg-black/25 backdrop-blur-md flex items-center justify-center group-hover:scale-105 group-hover:border-[#9AB51A] transition-transform">
                       <Play className="w-4 h-4 fill-white text-white ml-0.5" aria-hidden="true" />
                     </span>
                     <span className="drop-shadow">
@@ -568,7 +641,7 @@ export default function App() {
                 className="lg:col-span-6 relative flex items-center justify-center lg:justify-end pr-4 sm:pr-8"
               >
                 <div className="grid grid-cols-4 gap-2.5 sm:gap-3.5 w-full max-w-[490px] py-4">
-                  {HERO_SLICE_ITEMS.map((slice, idx) => {
+                  {HERO_CINEMATIC_SLIDES.map((slice, idx) => {
                     const isSelected = activeHeroSlice === idx;
                     return (
                       <a
@@ -578,9 +651,13 @@ export default function App() {
                         data-active={isSelected ? 'true' : 'false'}
                         onMouseEnter={() => {
                           setIsHeroCarouselPaused(true);
+                          setSlideDirection(idx >= activeHeroSlice ? 'next' : 'prev');
                           setActiveHeroSlice(idx);
                         }}
-                        onClick={() => setActiveHeroSlice(idx)}
+                        onClick={() => {
+                          setSlideDirection(idx >= activeHeroSlice ? 'next' : 'prev');
+                          setActiveHeroSlice(idx);
+                        }}
                         className={`slanted-slice-card relative h-56 sm:h-64 rounded-lg overflow-hidden flex flex-col justify-end p-2.5 group ${
                           isSelected ? 'ring-2 ring-[#9AB51A] -translate-y-2' : 'opacity-90'
                         }`}
@@ -596,7 +673,6 @@ export default function App() {
                           {slice.svgType === 'waterfall' && (
                             <>
                               <rect width="120" height="260" fill="#526978" />
-                              {/* Cascading river waterfall */}
                               <path
                                 d="M35,0 L85,0 L95,220 L25,220 Z"
                                 fill="#DCE8EF"
@@ -608,7 +684,6 @@ export default function App() {
                                 opacity="0.85"
                               />
                               <rect y="215" width="120" height="45" fill="#1B2830" />
-                              {/* Tiny observer silhouette in yellow jacket like reference */}
                               <circle cx="60" cy="204" r="3.5" fill="#F59E0B" />
                               <rect x="57" y="208" width="6" height="9" rx="2" fill="#F59E0B" />
                             </>
@@ -671,7 +746,7 @@ export default function App() {
                   className="hidden sm:flex flex-col items-center gap-2.5 ml-3"
                 >
                   <div className="w-px h-8 bg-white/40" />
-                  {HERO_SLICE_ITEMS.map((slice, idx) => {
+                  {HERO_CINEMATIC_SLIDES.map((slice, idx) => {
                     const isSelected = activeHeroSlice === idx;
                     return (
                       <button
@@ -682,7 +757,10 @@ export default function App() {
                         aria-label={`${lang === 'hi' ? 'स्लाइड' : 'Slide'} ${idx + 1}: ${
                           lang === 'hi' ? slice.titleHi : slice.titleEn
                         }`}
-                        onClick={() => setActiveHeroSlice(idx)}
+                        onClick={() => {
+                          setSlideDirection(idx >= activeHeroSlice ? 'next' : 'prev');
+                          setActiveHeroSlice(idx);
+                        }}
                         className={`w-2.5 h-2.5 rotate-45 transition-all ${
                           isSelected
                             ? 'bg-[#B8D82E] scale-125 border border-white'
@@ -741,11 +819,11 @@ export default function App() {
                   className="hidden md:inline-block text-xs text-white/95 ml-2 font-medium drop-shadow"
                 >
                   {lang === 'hi'
-                    ? `सक्रिय दृश्य (${activeHeroSlice + 1}/${HERO_SLICE_ITEMS.length}): ${
-                        HERO_SLICE_ITEMS[activeHeroSlice].titleHi
+                    ? `सक्रिय दृश्य (${activeHeroSlice + 1}/${HERO_CINEMATIC_SLIDES.length}): ${
+                         currentSlide.titleHi
                       }${isHeroCarouselPaused ? ' · रुका हुआ (Paused)' : ''}`
-                    : `Featured (${activeHeroSlice + 1}/${HERO_SLICE_ITEMS.length}): ${
-                        HERO_SLICE_ITEMS[activeHeroSlice].titleEn
+                    : `Featured (${activeHeroSlice + 1}/${HERO_CINEMATIC_SLIDES.length}): ${
+                        currentSlide.titleEn
                       }${isHeroCarouselPaused ? ' · Paused' : ''}`}
                 </span>
               </div>
@@ -770,37 +848,61 @@ export default function App() {
                 </button>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* 4-Column Frosted Glass KPI Strip Below Framed Window */}
           <div className="relative z-10 max-w-[1220px] mx-auto mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <article className="glass-panel-strong rounded-2xl p-4 sm:p-5">
+            <motion.article
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.35, delay: 0.04 }}
+              className="glass-panel-strong glass-sheen-card rounded-2xl p-4 sm:p-5"
+            >
               <div className="text-2xl sm:text-3xl font-tabular font-bold text-[#A8C628]">106 m</div>
               <div className="mt-1 text-xs font-medium text-zinc-200">
                 {lang === 'hi' ? 'समुद्र तल से ऊँचाई' : 'Elevation Above Sea Level'}
               </div>
-            </article>
+            </motion.article>
 
-            <article className="glass-panel-strong rounded-2xl p-4 sm:p-5">
+            <motion.article
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.35, delay: 0.1 }}
+              className="glass-panel-strong glass-sheen-card rounded-2xl p-4 sm:p-5"
+            >
               <div className="text-2xl sm:text-3xl font-tabular font-bold text-[#A8C628]">3 KM</div>
               <div className="mt-1 text-xs font-medium text-zinc-200">
-                {lang === 'hi' ? 'भेतुआ ब्लॉक मुख्यालय से दूरी' : 'Distance from Bhetua Block'}
+                {lang === 'hi' ? 'भेटुआ ब्लॉक मुख्यालय से दूरी' : 'Distance from Bhetua Block'}
               </div>
-            </article>
+            </motion.article>
 
-            <article className="glass-panel-strong rounded-2xl p-4 sm:p-5">
+            <motion.article
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.35, delay: 0.16 }}
+              className="glass-panel-strong glass-sheen-card rounded-2xl p-4 sm:p-5"
+            >
               <div className="text-2xl sm:text-3xl font-tabular font-bold text-[#A8C628]">25–27 KM</div>
               <div className="mt-1 text-xs font-medium text-zinc-200">
                 {lang === 'hi' ? 'सुल्तानपुर ज़िला मुख्यालय से' : 'From Sultanpur District HQ'}
               </div>
-            </article>
+            </motion.article>
 
-            <article className="glass-panel-strong rounded-2xl p-4 sm:p-5">
+            <motion.article
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.35, delay: 0.22 }}
+              className="glass-panel-strong glass-sheen-card rounded-2xl p-4 sm:p-5"
+            >
               <div className="text-2xl sm:text-3xl font-tabular font-bold text-[#A8C628]">05368</div>
               <div className="mt-1 text-xs font-medium text-zinc-200">
                 {lang === 'hi' ? 'क्षेत्रीय STD कोड' : 'Regional STD Telephone Code'}
               </div>
-            </article>
+            </motion.article>
           </div>
         </section>
 
@@ -829,10 +931,14 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {VILLAGE_ANNOUNCEMENTS.map((ann) => (
-                <article
+              {VILLAGE_ANNOUNCEMENTS.map((ann, idx) => (
+                <motion.article
                   key={ann.id}
-                  className="glass-panel rounded-2xl p-5 flex flex-col justify-between"
+                  initial={{ opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.34, delay: idx * 0.08 }}
+                  className="glass-panel glass-sheen-card rounded-2xl p-5 flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-center gap-2 text-xs text-zinc-300 mb-2">
@@ -849,7 +955,7 @@ export default function App() {
                       {lang === 'hi' ? ann.summaryHi : ann.summaryEn}
                     </p>
                   </div>
-                </article>
+                </motion.article>
               ))}
             </div>
           </div>
@@ -888,7 +994,7 @@ export default function App() {
             <p className="mt-3 text-sm sm:text-base text-zinc-200 leading-relaxed">
               {lang === 'hi'
                 ? 'इस वेबसाइट को गाँव के लोगों की यादों, वास्तविक तस्वीरों और प्रमाणित जानकारी से मिलकर और बेहतर बनाया जा सकता है।'
-                : 'Built to preserve and celebrate the verified heritage, institutions, and community spirit of Shivganj, Bhetua Block, Sultanpur.'}
+                : 'Built to preserve and celebrate the verified heritage, institutions, and community spirit of Shivganj, Bhetua Block, Amethi.'}
             </p>
             <div className="mt-6 flex items-center justify-center gap-3">
               <a
